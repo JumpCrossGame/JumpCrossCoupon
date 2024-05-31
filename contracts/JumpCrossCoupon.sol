@@ -152,6 +152,7 @@ contract JumpCrossCoupon is ERC20, Ownable, ReentrancyGuard {
 
     // @dev Owner can claim the protocol revenue.
     function claimRevenue() external onlyOwner {
+        _protocolRevenue = 0;
         payable(_msgSender()).transfer(_protocolRevenue);
     }
 
