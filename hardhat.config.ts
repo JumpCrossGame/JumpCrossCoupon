@@ -10,6 +10,12 @@ const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   networks: {
     hardhat: {
+      accounts: [
+        {
+          privateKey: env.privateKey, 
+          balance: "10000000000000000000", // 10 ether
+        },
+      ],
     },
     sepolia: {
       url: `https://eth-sepolia.g.alchemy.com/v2/${env.alchemyApiKey}`,

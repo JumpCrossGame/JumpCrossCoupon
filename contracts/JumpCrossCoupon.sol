@@ -22,7 +22,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 /// @author 0xmmq
 /// @notice You can use this contract to convert or redeem the JumpCross game coupon to play or exit the game.
 contract JumpCrossCoupon is ERC20, Ownable, ReentrancyGuard {
-    uint256 public constant EXCHANGE_RATE = 0.0014 ether;
+    uint256 public constant EXCHANGE_RATE = 0.000014 ether;
     uint256 public constant PROTOCOL_FEE_UPPER_LIMIT = 0.01 ether;
 
     /// @notice The following variables are used to calculate the protocol fee.
@@ -33,13 +33,19 @@ contract JumpCrossCoupon is ERC20, Ownable, ReentrancyGuard {
     uint256 public protocolFeeScale;
     uint256 public protocolExitMultiplier;
 
-    uint256 private _protocolRevenue;
+    uint256 public protocolRevenue;
 
     error InsufficientFundsError(uint256 required, uint256 inputed);
     error InvalidExchangeAmountError(uint256 inputed);
     error SetProtocolFeeError(string message);
 
-    constructor() ERC20("JumpCrossCoupon", "JCC") Ownable(msg.sender) {
+    event UpdateProtocolFee(
+        uint256 protocolFeeFactor,
+        uint256 protocolFeeScale,
+        uint256 protocolExitMultiplier
+    );
+
+    constructor() ERC20("JumpCrossCoupon", "JCC") Ownable(_msgSender()) {
         protocolFeeFactor = 8;
         protocolFeeScale = 10 ** 3;
         protocolExitMultiplier = 2;
@@ -51,7 +57,7 @@ contract JumpCrossCoupon is ERC20, Ownable, ReentrancyGuard {
 
     /// @notice Inform the user of the decimal precision of this token.
     /// @return Decimal precision
-    function decimals() public view virtual override returns (uint8) {
+    function decimals() public pure override returns (uint8) {
         return 0;
     }
 
@@ -83,7 +89,7 @@ contract JumpCrossCoupon is ERC20, Ownable, ReentrancyGuard {
             revert InsufficientFundsError(total, msg.value);
         }
 
-        _protocolRevenue += fee;
+        protocolRevenue += fee;
 
         _mint(_msgSender(), amount);
     }
@@ -119,7 +125,7 @@ contract JumpCrossCoupon is ERC20, Ownable, ReentrancyGuard {
             total = ethAmount - fee;
         }
 
-        _protocolRevenue += fee;
+        protocolRevenue += fee;
 
         payable(_msgSender()).transfer(total);
     }
@@ -152,13 +158,9 @@ contract JumpCrossCoupon is ERC20, Ownable, ReentrancyGuard {
 
     // @dev Owner can claim the protocol revenue.
     function claimRevenue() external onlyOwner {
-        _protocolRevenue = 0;
+        uint256 _protocolRevenue = protocolRevenue;
+        protocolRevenue = 0;
         payable(_msgSender()).transfer(_protocolRevenue);
-    }
-
-    // @dev Owner can check the protocol revenue.
-    function getProtocolRevenue() external view onlyOwner returns (uint256) {
-        return _protocolRevenue;
     }
 
     // @dev Helper function for making sure the protocol fee is within a reasonable range.
@@ -171,7 +173,7 @@ contract JumpCrossCoupon is ERC20, Ownable, ReentrancyGuard {
         uint256 _protocolFeeFactor,
         uint256 _protocolFeeDecimals,
         uint256 _protocolExitMultiplier
-    ) internal pure {
+    ) internal {
         if (_protocolFeeFactor < 1 || _protocolFeeFactor > 9) {
             revert SetProtocolFeeError("Invalid protocol fee factor");
         }
@@ -183,5 +185,11 @@ contract JumpCrossCoupon is ERC20, Ownable, ReentrancyGuard {
         if (_protocolExitMultiplier < 1 || _protocolExitMultiplier > 5) {
             revert SetProtocolFeeError("Invalid protocol exit multiplier");
         }
+
+        emit UpdateProtocolFee(
+            _protocolFeeFactor,
+            _protocolFeeDecimals,
+            _protocolExitMultiplier
+        );
     }
 }
