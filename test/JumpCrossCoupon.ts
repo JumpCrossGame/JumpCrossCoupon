@@ -116,9 +116,9 @@ describe("JumpCrossCoupon Test", function () {
       expect(await jcc.balanceOf(owner.address)).to.be.equal(BigInt(0));
 
       // fee = pawn + redeem
-      let expectProtocolRevenue = ethers.parseEther("0.00000112") + ethers.parseEther("0.00000224")
-      expect(await jcc.protocolRevenue()).to.be.equal(expectProtocolRevenue);
-      expect(await provider.getBalance(jcc)).to.be.equal(expectProtocolRevenue);
+      let expectRevenue = ethers.parseEther("0.00000112") + ethers.parseEther("0.00000224")
+      expect(await jcc.protocolRevenue()).to.be.equal(expectRevenue);
+      expect(await provider.getBalance(jcc)).to.be.equal(expectRevenue);
     
     
       // big amount case with upper limit protocol fee
@@ -127,9 +127,9 @@ describe("JumpCrossCoupon Test", function () {
       expect(await jcc.balanceOf(owner.address)).to.be.equal(BigInt(0));
 
       // fee = pawn + redeem(upper limit)
-      expectProtocolRevenue = expectProtocolRevenue + ethers.parseEther("0.01") + ethers.parseEther("0.02")
-      expect(await jcc.protocolRevenue()).to.be.equal(expectProtocolRevenue);
-      expect(await provider.getBalance(jcc)).to.be.equal(expectProtocolRevenue);
+      expectRevenue = expectRevenue + ethers.parseEther("0.01") + ethers.parseEther("0.02")
+      expect(await jcc.protocolRevenue()).to.be.equal(expectRevenue);
+      expect(await provider.getBalance(jcc)).to.be.equal(expectRevenue);
     });
   });
 
@@ -194,40 +194,88 @@ describe("JumpCrossCoupon Test", function () {
       
       // simulate pay protocol fee for pawn 100 $JCC and redeem 10 $JCC
       await jcc.pawn(BigInt(100), {value: ethers.parseEther("0.0014112")})
-      let expectProtocolRevenue = ethers.parseEther("0.0000112")
+      let expectRevenue = ethers.parseEther("0.0000112")
       expect(await provider.getBalance(jcc)).to.be.equal(ethers.parseEther("0.0014112"));
-      expect(await jcc.protocolRevenue()).to.be.equal(expectProtocolRevenue);
+      expect(await jcc.protocolRevenue()).to.be.equal(expectRevenue);
 
       await expect(jcc.redeem(BigInt(10))).to.be.not.reverted;
       // fee = pawn + redeem
-      expectProtocolRevenue += ethers.parseEther("0.00000224")
+      expectRevenue += ethers.parseEther("0.00000224")
       expect(await jcc.balanceOf(owner.address)).to.be.equal(BigInt(90));
-      expect(await jcc.protocolRevenue()).to.be.equal(expectProtocolRevenue);
+      expect(await jcc.protocolRevenue()).to.be.equal(expectRevenue);
 
       // the eth balance here will be `protocol revenue` + `$ETH equivalent to $90 JCC`
       expect(await provider.getBalance(jcc)).to.be
-      .equal(expectProtocolRevenue + BigInt(90) * ethers.parseEther("0.000014"));
+      .equal(expectRevenue + BigInt(90) * ethers.parseEther("0.000014"));
       
-      // claim
-          
-      let balanceBefore = await provider.getBalance(owner.address);
+      // claim revenue
+      const balanceBefore = await provider.getBalance(owner.address);
       const tx = await jcc.claimRevenue();
       const receipt = await tx.wait();
       expect(receipt).to.be.not.null;
       const gasUsed = receipt!.gasUsed;
       const gasCost = gasUsed * receipt!.gasPrice;
 
-      let balanceAfter = await provider.getBalance(owner.address);
+      const balanceAfter = await provider.getBalance(owner.address);
 
-      expect(balanceBefore + expectProtocolRevenue - gasCost).to.be.equal(balanceAfter);
-
+      expect(balanceBefore + expectRevenue - gasCost).to.be.equal(balanceAfter);
       expect(await jcc.protocolRevenue()).to.be.equal(BigInt(0));
-      
       expect(await provider.getBalance(jcc)).to.be.equal(BigInt(90) * ethers.parseEther("0.000014"));
     });
   });
 
   describe("Integration test", async function () {
+    it ("Integration test", async function () {
+      const { jcc, owner, provider } = await loadFixture(deploy);
 
+      // pawn 100 $JCC
+      await jcc.pawn(BigInt(100), {value: ethers.parseEther("0.0014112")})
+      
+      // redeem 30 $JCC
+      await jcc.redeem(BigInt(30))
+    
+      // check point 1: the revenue should be 0.0000112 + 0.00000672
+      let expectRevenue = ethers.parseEther("0.0000112") + ethers.parseEther("0.00000672")
+      expect(await jcc.protocolRevenue()).to.be.equal(expectRevenue);
+      expect(await jcc.balanceOf(owner.address)).to.be.equal(BigInt(70));
+
+      // change protocol fee parameters
+      // the protocol fee fomula will be ethAmount * 0.01
+      // the protocol exit fee will be ethAmount * 0.03
+      await jcc.updateProtocolFee(BigInt(1), BigInt(2), BigInt(3));
+
+      // pawn 30
+      await jcc.pawn(BigInt(30), {value: ethers.parseEther("0.0004242")})
+
+      // pawn 50
+      await jcc.pawn(BigInt(50), {value: ethers.parseEther("0.000707")})
+
+      // redeem 150
+      await jcc.redeem(BigInt(150))
+
+      // check point 2: the revenue should be 0.0000042 + 0.000007 + 0.000063
+      expectRevenue = expectRevenue + 
+        ethers.parseEther("0.0000042") + 
+        ethers.parseEther("0.000007") + 
+        ethers.parseEther("0.000063")
+
+      expect(await jcc.protocolRevenue()).to.be.equal(expectRevenue);
+      expect(await jcc.balanceOf(owner.address)).to.be.equal(BigInt(0));
+
+      // claim revenue
+      const balanceBefore = await provider.getBalance(owner.address);
+      const tx = await jcc.claimRevenue();
+      const receipt = await tx.wait();
+      expect(receipt).to.be.not.null;
+      const gasUsed = receipt!.gasUsed;
+      const gasCost = gasUsed * receipt!.gasPrice;
+
+      const balanceAfter = await provider.getBalance(owner.address);
+
+      // check point 3: the revenue should be 0
+      expect(balanceBefore + expectRevenue - gasCost).to.be.equal(balanceAfter);
+      expect(await jcc.protocolRevenue()).to.be.equal(BigInt(0));
+      expect(await provider.getBalance(jcc)).to.be.equal(BigInt(0));
+    });
   });
 });
