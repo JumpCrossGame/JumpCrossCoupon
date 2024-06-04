@@ -1,13 +1,5 @@
-# Sample Hardhat Project
+# JCC(JumpCrossCoupon)-ERC20
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+This contract is a game token for the JumpCross game.
 
-Try running some of the following tasks:
-
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat ignition deploy ./ignition/modules/Lock.ts
-```
+[Contract (Sepolia): 0xD59BE5afE8cF939BfFBC1Cb3D2c5545eBD8A7917](https://sepolia.etherscan.io/address/0xD59BE5afE8cF939BfFBC1Cb3D2c5545eBD8A7917#code)
